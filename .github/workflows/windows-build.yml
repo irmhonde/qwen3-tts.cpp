@@ -26,7 +26,7 @@ jobs:
       - name: Build qwen3-tts.cpp (CLI Only)
         run: |
           # We disable shared libs to avoid the fPIC linking error
-          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_POSITION_INDEPENDENT_CODE=ON
           cmake --build build -j $(nproc)
 
       - name: Upload CLI Artifact
