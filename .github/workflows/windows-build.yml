@@ -1,53 +1,37 @@
-name: Build Windows x64
+name: Build Ubuntu x64
 
 on:
   workflow_dispatch:
 
 jobs:
   build:
-    name: Build (Windows x64)
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code (with submodules)
+      - name: Checkout code
         uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      # Provides a stable, single-config generator across runner changes.
-      - name: Setup Ninja
-        uses: seanmiddleditch/gha-setup-ninja@v5
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake libasound2-dev
 
-      - name: Setup MSVC (cl, link, etc.)
-        uses: ilammy/msvc-dev-cmd@v1
+      - name: Build GGML
+        run: |
+          cmake -S ggml -B ggml/build -DCMAKE_BUILD_TYPE=Release
+          cmake --build ggml/build -j $(nproc)
 
-      - name: Configure GGML (Release, CPU only)
-        run: >
-          cmake -S ggml -B ggml/build
-          -G Ninja
-          -DCMAKE_BUILD_TYPE=Release
-          -DGGML_OPENMP=OFF
-          -D_USE_MATH_DEFINES=1
+      - name: Build qwen3-tts.cpp
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build -j $(nproc)
 
-      - name: Build GGML (Release)
-        run: cmake --build ggml/build --config Release -j 4
-
-      - name: Configure qwen3-tts.cpp (Release)
-        run: >
-          cmake -S . -B build
-          -G Ninja
-          -DCMAKE_BUILD_TYPE=Release
-          -D_USE_MATH_DEFINES=1
-          -D_CRT_SECURE_NO_WARNINGS=1
-
-      - name: Build qwen3-tts.cpp (Release)
-        run: cmake --build build --config Release -j 4
-
-      - name: Upload artifacts
+      - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: qwen3-tts-windows-x64
-          if-no-files-found: error
+          name: qwen3-tts-ubuntu-x64
           path: |
-            build/**/qwen3-tts-cli.exe
-            build/**/*.dll
+            build/qwen3-tts-cli
+            build/*.so
