@@ -20,27 +20,29 @@ jobs:
 
       - name: Build GGML Statically
         run: |
-          # Build GGML first with OpenMP enabled and as a static library
+          # 1. Build GGML as a static library
           cmake -S ggml -B ggml/build \
             -DBUILD_SHARED_LIBS=OFF \
             -DGGML_OPENMP=ON \
             -DCMAKE_POSITION_INDEPENDENT_CODE=ON
           cmake --build ggml/build --config Release -j $(nproc)
+          
+          # 2. FORCE STATIC: Remove any .so files so the main build can't find them
+          find ggml/build -name "*.so*" -delete
 
       - name: Build qwen3-tts.cpp (Fat Binary)
         run: |
-          # 1. We force the linker to include OpenMP (gomp) 
-          # 2. We point to the static GGML build
-          # 3. We disable shared libs to ensure a monolithic executable
+          # 3. Build the main project
+          # We pass -static-libstdc++ to make it even more portable
           cmake -S . -B build \
             -DCMAKE_BUILD_TYPE=Release \
             -DBUILD_SHARED_LIBS=OFF \
             -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
             -DGGML_DIR=$(pwd)/ggml/build \
-            -DCMAKE_EXE_LINKER_FLAGS="-fopenmp" \
+            -DCMAKE_EXE_LINKER_FLAGS="-fopenmp -static-libstdc++ -static-libgcc" \
             -DCMAKE_CXX_FLAGS="-fopenmp"
           
-          # Build only the CLI target
+          # 4. Build only the CLI target
           cmake --build build --target qwen3-tts-cli -j $(nproc)
 
       - name: Upload CLI Artifact
