@@ -16,27 +16,29 @@ jobs:
       - name: Install Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential cmake libasound2-dev
+          sudo apt-get install -y build-essential cmake libasound2-dev libgomp1
 
       - name: Build GGML Statically
         run: |
-          # 1. We MUST force GGML to be static so the code goes INTO the CLI
-          # We also disable things we don't need to keep it simple
+          # Build GGML first with OpenMP enabled and as a static library
           cmake -S ggml -B ggml/build \
             -DBUILD_SHARED_LIBS=OFF \
             -DGGML_OPENMP=ON \
             -DCMAKE_POSITION_INDEPENDENT_CODE=ON
           cmake --build ggml/build --config Release -j $(nproc)
 
-      - name: Build qwen3-tts.cpp
+      - name: Build qwen3-tts.cpp (Fat Binary)
         run: |
-          # We add -DCMAKE_EXE_LINKER_FLAGS="-lgomp" to fix the OpenMP link error
+          # 1. We force the linker to include OpenMP (gomp) 
+          # 2. We point to the static GGML build
+          # 3. We disable shared libs to ensure a monolithic executable
           cmake -S . -B build \
             -DCMAKE_BUILD_TYPE=Release \
             -DBUILD_SHARED_LIBS=OFF \
             -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
             -DGGML_DIR=$(pwd)/ggml/build \
-            -DCMAKE_EXE_LINKER_FLAGS="-lgomp"
+            -DCMAKE_EXE_LINKER_FLAGS="-fopenmp" \
+            -DCMAKE_CXX_FLAGS="-fopenmp"
           
           # Build only the CLI target
           cmake --build build --target qwen3-tts-cli -j $(nproc)
