@@ -1,4 +1,4 @@
-name: Build Ubuntu x64
+name: Build Ubuntu x64 (CUDA 12)
 
 on:
   workflow_dispatch:
@@ -13,40 +13,44 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Install CUDA Toolkit
+        uses: jimderoert/setup-cuda@v2
+        with:
+          cuda_version: '12.4' # Matches CUDA 12.x series
+
       - name: Install Dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential cmake libasound2-dev libgomp1
 
-      - name: Build GGML Statically
+      - name: Build GGML with CUDA
         run: |
-          # Build GGML as a static library
+          # We enable GGML_CUDA to offload tensors to the GPU
           cmake -S ggml -B ggml/build \
+            -DGGML_CUDA=ON \
             -DBUILD_SHARED_LIBS=OFF \
-            -DGGML_OPENMP=ON \
             -DCMAKE_POSITION_INDEPENDENT_CODE=ON
           cmake --build ggml/build --config Release -j $(nproc)
           
-          # Force static: remove any shared objects that might be found accidentally
+          # Force static: remove any .so files to ensure the engine is bundled
           find ggml/build -name "*.so*" -delete
 
-      - name: Build qwen3-tts.cpp (Standalone CLI)
+      - name: Build qwen3-tts.cpp (CUDA Fat Binary)
         run: |
-          # We use -fopenmp to ensure the math backend is enabled
-          # We use static-libstdc++ to make the binary portable
+          # We pass -DGGML_CUDA=ON so the main project links the CUDA kernels
           cmake -S . -B build \
             -DCMAKE_BUILD_TYPE=Release \
+            -DGGML_CUDA=ON \
             -DBUILD_SHARED_LIBS=OFF \
             -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
             -DGGML_DIR=$(pwd)/ggml/build \
             -DCMAKE_EXE_LINKER_FLAGS="-fopenmp -static-libstdc++ -static-libgcc" \
             -DCMAKE_CXX_FLAGS="-fopenmp"
           
-          # Build only the CLI target
           cmake --build build --target qwen3-tts-cli -j $(nproc)
 
       - name: Upload CLI Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: qwen3-tts-ubuntu-x64
+          name: qwen3-tts-ubuntu-cuda12
           path: build/qwen3-tts-cli
