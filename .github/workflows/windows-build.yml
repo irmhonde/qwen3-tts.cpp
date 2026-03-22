@@ -6,37 +6,39 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    # We use the official NVIDIA development container to ensure CUDA 12.x is present
+    
+    # We move the container definition to the job level but handle git first
     container:
       image: nvidia/cuda:12.4.1-devel-ubuntu22.04
 
     steps:
+      # Step 1: Install Git inside the container so checkout works
+      - name: Install Git and Build Dependencies
+        run: |
+          apt-get update
+          apt-get install -y git build-essential cmake libasound2-dev libgomp1
+
+      # Step 2: Now checkout will work because 'git' is in the PATH
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      - name: Install Dependencies
+      - name: Build GGML Statically (CUDA)
         run: |
-          apt-get update
-          apt-get install -y build-essential cmake libasound2-dev libgomp1 git
-
-      - name: Build GGML with CUDA
-        run: |
-          # 1. Build GGML with CUDA backend enabled
-          # We use -DGGML_CUDA=ON to target your discrete GPU
+          # Build GGML with CUDA support
           cmake -S ggml -B ggml/build \
             -DGGML_CUDA=ON \
             -DBUILD_SHARED_LIBS=OFF \
             -DCMAKE_POSITION_INDEPENDENT_CODE=ON
           cmake --build ggml/build --config Release -j $(nproc)
           
-          # Force static: remove any shared objects to ensure the engine is bundled
+          # Force static: remove shared libs
           find ggml/build -name "*.so*" -delete
 
       - name: Build qwen3-tts.cpp (CUDA Fat Binary)
         run: |
-          # 2. Build the main project linking to the CUDA-enabled GGML
+          # Build the main CLI linking to the CUDA engine
           cmake -S . -B build \
             -DCMAKE_BUILD_TYPE=Release \
             -DGGML_CUDA=ON \
