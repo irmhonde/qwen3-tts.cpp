@@ -18,26 +18,26 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential cmake libasound2-dev
 
-      - name: Build GGML (Static)
+      - name: Build GGML Statically
         run: |
-          # Build GGML first so the main project can find the static libs
+          # 1. We MUST force GGML to be static so the code goes INTO the CLI
+          # We also disable things we don't need to keep it simple
           cmake -S ggml -B ggml/build \
-            -DCMAKE_BUILD_TYPE=Release \
             -DBUILD_SHARED_LIBS=OFF \
+            -DGGML_OPENMP=ON \
             -DCMAKE_POSITION_INDEPENDENT_CODE=ON
-          cmake --build ggml/build -j $(nproc)
+          cmake --build ggml/build --config Release -j $(nproc)
 
-      - name: Build qwen3-tts.cpp (Fat Binary)
+      - name: Build qwen3-tts.cpp
         run: |
-          # We force BUILD_SHARED_LIBS=OFF to ensure tokenizer, encoder, 
-          # and transformer libs are baked into the CLI.
+          # 2. Build the main project
+          # We don't build the shared library (qwen3tts_shared) to avoid PIC errors
           cmake -S . -B build \
             -DCMAKE_BUILD_TYPE=Release \
             -DBUILD_SHARED_LIBS=OFF \
-            -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
-            -DGGML_DIR=$(pwd)/ggml/build
+            -DCMAKE_POSITION_INDEPENDENT_CODE=ON
           
-          # Explicitly build the CLI target
+          # 3. We build ONLY the CLI target
           cmake --build build --target qwen3-tts-cli -j $(nproc)
 
       - name: Upload CLI Artifact
