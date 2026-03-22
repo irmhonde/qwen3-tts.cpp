@@ -23,22 +23,31 @@ jobs:
           cmake -S ggml -B ggml/build -DCMAKE_BUILD_TYPE=Release
           cmake --build ggml/build -j $(nproc)
 
-      - name: Build qwen3-tts.cpp (Static Standalone)
+      - name: Build qwen3-tts.cpp (Absolute Static)
         run: |
-          # 1. Force a clean build directory
-          rm -rf build
+          # 1. Clean everything
+          rm -rf build ggml/build
           
-          # 2. Configure with Static Linking and OpenMP
-          # We force PIC but disable Shared Libs to bundle GGML into the CLI.
-          # We enable OpenMP so the CPU can use all your cores.
-          cmake -S . -B build \
+          # 2. Configure GGML specifically as STATIC
+          cmake -S ggml -B ggml/build \
             -DCMAKE_BUILD_TYPE=Release \
             -DBUILD_SHARED_LIBS=OFF \
             -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
-            -DGGML_OPENMP=ON \
-            -DGGML_CUDA=OFF
+            -DGGML_OPENMP=ON
+
+          # 3. Build GGML first
+          cmake --build ggml/build --config Release -j $(nproc)
+
+          # 4. Configure main project pointing to the STATIC ggml
+          # We use -DGGML_SHARED=OFF to force the CLI to swallow the library
+          cmake -S . -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_SHARED_LIBS=OFF \
+            -DGGML_SHARED=OFF \
+            -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+            -DGGML_DIR=$(pwd)/ggml/build
             
-          # 3. Build the CLI target specifically
+          # 5. Build only the CLI
           cmake --build build --target qwen3-tts-cli -j $(nproc)
 
       - name: Upload CLI Artifact
