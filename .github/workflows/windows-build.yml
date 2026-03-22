@@ -27,6 +27,7 @@ jobs:
           -G Ninja
           -DCMAKE_BUILD_TYPE=Release
           -DGGML_OPENMP=OFF
+          -DCMAKE_CXX_FLAGS="/D_USE_MATH_DEFINES"
 
       - name: Build GGML (Release)
         run: cmake --build ggml/build --config Release -j 4
@@ -36,6 +37,7 @@ jobs:
           cmake -S . -B build
           -G Ninja
           -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_CXX_FLAGS="/D_USE_MATH_DEFINES"
 
       - name: Build qwen3-tts.cpp (Release)
         run: cmake --build build --config Release -j 4
