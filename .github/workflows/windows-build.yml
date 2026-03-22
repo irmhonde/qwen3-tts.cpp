@@ -23,15 +23,14 @@ jobs:
           cmake -S ggml -B ggml/build -DCMAKE_BUILD_TYPE=Release
           cmake --build ggml/build -j $(nproc)
 
-      - name: Build qwen3-tts.cpp
+      - name: Build qwen3-tts.cpp (CLI Only)
         run: |
-          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+          # We disable shared libs to avoid the fPIC linking error
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF
           cmake --build build -j $(nproc)
 
-      - name: Upload Artifact
+      - name: Upload CLI Artifact
         uses: actions/upload-artifact@v4
         with:
           name: qwen3-tts-ubuntu-x64
-          path: |
-            build/qwen3-tts-cli
-            build/*.so
+          path: build/qwen3-tts-cli
