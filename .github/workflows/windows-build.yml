@@ -1,35 +1,50 @@
 name: Build Windows x64
 
-on: 
-  workflow_dispatch: # Allows you to run this manually from the Actions tab
+on:
+  workflow_dispatch:
 
 jobs:
   build:
+    name: Build (Windows x64)
     runs-on: windows-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout code (with submodules)
         uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      - name: Setup MSVC
+      # Provides a stable, single-config generator across runner changes.
+      - name: Setup Ninja
+        uses: seanmiddleditch/gha-setup-ninja@v5
+
+      - name: Setup MSVC (cl, link, etc.)
         uses: ilammy/msvc-dev-cmd@v1
 
-      - name: Build GGML (CPU Only)
-        run: |
-          cmake -S ggml -B ggml/build -DGGML_OPENMP=OFF
-          cmake --build ggml/build --config Release -j 4
+      - name: Configure GGML (Release, CPU only)
+        run: >
+          cmake -S ggml -B ggml/build
+          -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DGGML_OPENMP=OFF
 
-      - name: Build qwen3-tts.cpp
-        run: |
-          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-          cmake --build build --config Release -j 4
+      - name: Build GGML (Release)
+        run: cmake --build ggml/build --config Release -j 4
 
-      - name: Upload Artifacts
+      - name: Configure qwen3-tts.cpp (Release)
+        run: >
+          cmake -S . -B build
+          -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build qwen3-tts.cpp (Release)
+        run: cmake --build build --config Release -j 4
+
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: qwen3-tts-windows-x64
+          if-no-files-found: error
           path: |
-            build/Release/qwen3-tts-cli.exe
-            build/Release/*.dll
+            build/**/qwen3-tts-cli.exe
+            build/**/*.dll
