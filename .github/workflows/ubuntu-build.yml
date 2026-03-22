@@ -26,10 +26,9 @@ jobs:
           cmake -S ggml -B ggml/build -DCMAKE_BUILD_TYPE=Release
           cmake --build ggml/build -j $(nproc)
 
-      - name: Build qwen3-tts.cpp (CLI Only)
+      - name: Build qwen3-tts.cpp
         run: |
-          # Build CLI only; shared library is opt-in via BUILD_SHARED_LIBS=ON
-          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_POSITION_INDEPENDENT_CODE=ON
           cmake --build build -j $(nproc)
 
       - name: Upload CLI Artifact
