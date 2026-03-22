@@ -6,6 +6,9 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # We use the official NVIDIA development container to ensure CUDA 12.x is present
+    container:
+      image: nvidia/cuda:12.4.1-devel-ubuntu22.04
 
     steps:
       - name: Checkout code
@@ -13,31 +16,27 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Install CUDA Toolkit
-        uses: jimderoert/setup-cuda@v2
-        with:
-          cuda_version: '12.4' # Matches CUDA 12.x series
-
       - name: Install Dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential cmake libasound2-dev libgomp1
+          apt-get update
+          apt-get install -y build-essential cmake libasound2-dev libgomp1 git
 
       - name: Build GGML with CUDA
         run: |
-          # We enable GGML_CUDA to offload tensors to the GPU
+          # 1. Build GGML with CUDA backend enabled
+          # We use -DGGML_CUDA=ON to target your discrete GPU
           cmake -S ggml -B ggml/build \
             -DGGML_CUDA=ON \
             -DBUILD_SHARED_LIBS=OFF \
             -DCMAKE_POSITION_INDEPENDENT_CODE=ON
           cmake --build ggml/build --config Release -j $(nproc)
           
-          # Force static: remove any .so files to ensure the engine is bundled
+          # Force static: remove any shared objects to ensure the engine is bundled
           find ggml/build -name "*.so*" -delete
 
       - name: Build qwen3-tts.cpp (CUDA Fat Binary)
         run: |
-          # We pass -DGGML_CUDA=ON so the main project links the CUDA kernels
+          # 2. Build the main project linking to the CUDA-enabled GGML
           cmake -S . -B build \
             -DCMAKE_BUILD_TYPE=Release \
             -DGGML_CUDA=ON \
