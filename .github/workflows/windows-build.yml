@@ -6,19 +6,15 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    
-    # We move the container definition to the job level but handle git first
     container:
       image: nvidia/cuda:12.4.1-devel-ubuntu22.04
 
     steps:
-      # Step 1: Install Git inside the container so checkout works
       - name: Install Git and Build Dependencies
         run: |
           apt-get update
           apt-get install -y git build-essential cmake libasound2-dev libgomp1
 
-      # Step 2: Now checkout will work because 'git' is in the PATH
       - name: Checkout code
         uses: actions/checkout@v4
         with:
@@ -33,19 +29,19 @@ jobs:
             -DCMAKE_POSITION_INDEPENDENT_CODE=ON
           cmake --build ggml/build --config Release -j $(nproc)
           
-          # Force static: remove shared libs
+          # Remove shared libs to force static linking
           find ggml/build -name "*.so*" -delete
 
       - name: Build qwen3-tts.cpp (CUDA Fat Binary)
         run: |
-          # Build the main CLI linking to the CUDA engine
+          # We add the CUDA library paths and explicitly link ggml-cuda
+          # The -L paths help the linker find the .a files we built in the previous step
           cmake -S . -B build \
             -DCMAKE_BUILD_TYPE=Release \
-            -DGGML_CUDA=ON \
             -DBUILD_SHARED_LIBS=OFF \
             -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
             -DGGML_DIR=$(pwd)/ggml/build \
-            -DCMAKE_EXE_LINKER_FLAGS="-fopenmp -static-libstdc++ -static-libgcc" \
+            -DCMAKE_EXE_LINKER_FLAGS="-fopenmp -static-libstdc++ -static-libgcc -L$(pwd)/ggml/build/src -lggml-cuda -lcudart -lcublas" \
             -DCMAKE_CXX_FLAGS="-fopenmp"
           
           cmake --build build --target qwen3-tts-cli -j $(nproc)
